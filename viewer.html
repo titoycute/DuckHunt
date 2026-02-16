@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duck Hunt Tool Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Press+Start+2P', cursive;
+            user-select: none;
+            color: white;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* Using the same background concept from your files */
+            background-image: url('bg_field.gif');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .retro-panel {
+            background: rgba(0, 0, 0, 0.85);
+            border: 6px solid #fff;
+            padding: 40px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            text-align: center;
+            max-width: 800px;
+            width: 90%;
+        }
+
+        .menu-title {
+            font-size: 24px;
+            color: #ffeb3b;
+            text-shadow: 4px 4px #000;
+            margin-bottom: 40px;
+            letter-spacing: 2px;
+        }
+
+        .menu-options {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .menu-btn {
+            background: #ff5722;
+            color: white;
+            padding: 20px;
+            border: 4px solid #bf360c;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.1s;
+            display: block;
+        }
+
+        .menu-btn:hover {
+            background: #ff7043;
+            transform: scale(1.02);
+        }
+
+        .menu-btn:active {
+            transform: scale(0.98);
+        }
+
+        .description {
+            font-size: 8px;
+            margin-top: 10px;
+            color: #0f0; /* Retro green */
+            display: block;
+        }
+
+        .footer-text {
+            position: absolute;
+            bottom: 20px;
+            font-size: 10px;
+            text-shadow: 2px 2px #000;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="retro-panel">
+        <h1 class="menu-title">READY TO HUNT? CHOOSE A TOOL TO START.</h1>
+        
+        <div class="menu-options">
+            <a href="tool-team.html" class="menu-btn">
+                RANDOM GROUP GENERATOR
+                <span class="description">SPLIT NAMES INTO RANDOM TEAMS</span>
+            </a>
+
+            <a href="tool-group-hunt.html" class="menu-btn" style="background: #4caf50; border-color: #2e7d32;">
+                RANDOM GROUP PICKER
+                <span class="description" style="color: #fff;">PICK RANDOM GROUPS FROM A LIST</span>
+            </a>
+
+            <a href="tool-name-picker.html" class="menu-btn" style="background: #2196f3; border-color: #0d47a1;">
+                RANDOM NAME PICKER & QUESTION
+                <span class="description" style="color: #ffeb3b;">RANDOM NAME PICKER + SPINNING WHEEL</span>
+            </a>
+
+            <a href="tool-wheel.html" class="menu-btn" style="background: #9c27b0; border-color: #7b1fa2;">
+                MEGA WHEEL
+                <span class="description" style="color: #fff;">STANDALONE SPINNING WHEEL</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="footer-text">READY TO HUNT? CHOOSE A TOOL TO START.</div>
+
+</body>
+
+<script>
+    const remoteChannel = new BroadcastChannel('duck_hunt_controls');
+    remoteChannel.onmessage = (event) => {
+        if (event.data.type === 'NAVIGATE') {
+            window.location.href = event.data.url;
+        }
+        // If you are already home, RELOAD is useful
+        if (event.data === 'RELOAD') {
+            location.reload();
+        }
+    };
+    
+</script>
+</html>

@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duck Hunt Random Name Picker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Press+Start+2P', cursive;
+            user-select: none;
+        }
+
+        #game-canvas {
+            display: block;
+            /* Updated to use the RPG Pixel Art background */
+            background-image: url('bg_field.gif');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .panel {
+            pointer-events: auto;
+            background: rgba(0, 0, 0, 0.85);
+            border: 6px solid #fff;
+            color: #fff;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        #setup-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+
+        textarea {
+            font-family: monospace;
+            width: 100%;
+            height: 120px;
+            margin: 10px 0;
+            padding: 15px;
+            background: #222;
+            color: #0f0;
+            border: 3px solid #555;
+            font-size: 12px;
+            outline: none;
+        }
+
+        button {
+            background: #ff5722;
+            color: white;
+            padding: 12px 20px;
+            border: 4px solid #bf360c;
+            cursor: pointer;
+            font-family: 'Press+Start+2P', cursive;
+            font-size: 12px;
+            transition: all 0.1s;
+        }
+
+        button:hover {
+            background: #ff7043;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .secondary-btn {
+            background: #4caf50;
+            border-color: #2e7d32;
+        }
+
+        .secondary-btn:hover { background: #66bb6a; }
+
+        #winner-popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            z-index: 400;
+            width: 90%;
+            max-width: 800px;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #winner-popup.active {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #winner-name {
+            font-size: 4rem; 
+            line-height: 1.2;
+            margin: 40px 0;
+            color: #00ff00;
+            text-shadow: 4px 4px #000, 0 0 20px #00ff00;
+            animation: pulse 1s infinite;
+            word-wrap: break-word;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.05); filter: brightness(1.5); }
+            100% { transform: scale(1); filter: brightness(1); }
+        }
+
+        #wheel-container {
+            position: absolute;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 250px;
+            height: 250px;
+            pointer-events: auto;
+            z-index: 50;
+            display: none;
+        }
+
+        #wheel-canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 6px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background: #fff;
+            cursor: pointer;
+        }
+
+        .wheel-pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #ff0000;
+            z-index: 60;
+        }
+
+        #selected-question-box {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 1100px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 6px solid #ffeb3b;
+            color: white;
+            padding: 35px 20px;
+            text-align: center;
+            display: none;
+            z-index: 200;
+        }
+
+        #question-label {
+            color: #ffeb3b;
+            font-size: 14px;
+            letter-spacing: 4px;
+            margin-bottom: 25px;
+            display: block;
+        }
+
+        #question-text {
+            font-size: 2.5rem;
+            line-height: 1.2;
+            display: block;
+            text-transform: uppercase;
+            text-shadow: 3px 3px 0px #000;
+            word-wrap: break-word;
+        }
+
+        .status-bar {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            color: white;
+            font-size: 12px;
+            text-shadow: 2px 2px #000;
+        }
+
+        #intermission-control {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 300;
+            display: none;
+        }
+
+        #history-panel {
+            width: 250px;
+            border-right: 4px solid #555;
+            padding-right: 20px;
+            margin-right: 20px;
+            text-align: left;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            background: #333;
+            border: 2px solid #555;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 8px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .history-item:hover {
+            border-color: #0f0;
+        }
+
+        .delete-history {
+            color: #ff5722;
+            float: right;
+            margin-left: 5px;
+        }
+
+        @media (max-width: 800px) {
+            #question-text { font-size: 1.2rem; }
+            #winner-name { font-size: 2rem; }
+            #wheel-container { width: 150px; height: 150px; right: 10px; }
+            #setup-content { flex-direction: column !important; }
+            #history-panel { width: 100%; border-right: none; border-bottom: 4px solid #555; margin-bottom: 20px; padding-bottom: 20px; }
+        }
+
+        /* Floating Back Button Style */
+.floating-back-btn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 9999; /* Ensures it stays above all other UI layers */
+    background: #555; /* Neutral grey to distinguish it from action buttons */
+    color: white;
+    padding: 10px 15px;
+    border: 4px solid #333;
+    font-family: 'Press+Start+2P', cursive;
+    font-size: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: transform 0.1s;
+}
+
+.floating-back-btn:hover {
+    background: #777;
+}
+
+.floating-back-btn:active {
+    transform: translateY(4px);
+}
+    </style>
+</head>
+<body>
+    <a href="viewer.html" class="floating-back-btn">
+    &lt; BACK
+</a>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="setup-screen" class="ui-overlay">
+        <div class="panel max-w-[1000px] w-[95%]">
+            <h1 class="text-xl mb-6">DUCK PICKER PRO</h1>
+            
+            <div id="setup-content" class="flex flex-row gap-4">
+                <div id="history-panel">
+                    <p class="text-[10px] text-yellow-400 mb-4 underline">SAVED PRESETS</p>
+                    <div id="history-list"></div>
+                </div>
+
+                <div class="flex-1">
+                    <div class="flex gap-4 mb-4">
+                        <div class="flex-1">
+                            <p class="text-[10px] mb-2">NAMES</p>
+                            <textarea id="name-input" placeholder="Enter names..."></textarea>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-[10px] mb-2">QUESTIONS</p>
+                            <textarea id="question-input" placeholder="Enter questions..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-4 justify-center">
+                        <input type="text" id="preset-name" placeholder="PRESET NAME" class="bg-black border-2 border-white p-2 text-[10px] text-white outline-none w-48">
+                        <button onclick="saveToHistory()" class="secondary-btn">SAVE PRESET</button>
+                        <button onclick="startGame()">LOAD FIELD</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="selected-question-box">
+        <span id="question-label">CURRENT TOPIC / QUESTION</span>
+        <span id="question-text">SPIN THE WHEEL!</span>
+    </div>
+
+    <div id="intermission-control">
+      <button onclick="startScanningSequence()" style="font-size: 20px; padding: 20px 40px; background: #ff5722;">START HUNTING!</button>
+    </div>
+
+    <div id="wheel-container">
+        <div class="wheel-pointer"></div>
+        <canvas id="wheel-canvas" width="400" height="400"></canvas>
+        <p class="text-[8px] text-white text-center mt-2">CLICK TO SPIN</p>
+    </div>
+
+    <div id="winner-popup" class="panel">
+        <h2 class="text-yellow-400 text-xl mb-4">IT'S YOUR TURN!</h2>
+        <div id="winner-name">NAME</div>
+        <div class="flex justify-center gap-4 mt-8">
+            <button onclick="resetToSetup()">EDIT LISTS</button>
+            <button onclick="continueGame()" id="next-btn">NEXT TARGET</button>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span>DUCKS: <span id="duck-count">0</span></span>
+        <span id="game-msg">WAITING...</span>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const nameInput = document.getElementById('name-input');
+        const questionInput = document.getElementById('question-input');
+        const presetNameInput = document.getElementById('preset-name');
+        const setupScreen = document.getElementById('setup-screen');
+        const winnerPopup = document.getElementById('winner-popup');
+        const winnerNameText = document.getElementById('winner-name');
+        const duckCountSpan = document.getElementById('duck-count');
+        const gameMsg = document.getElementById('game-msg');
+        const wheelContainer = document.getElementById('wheel-container');
+        const wheelCanvas = document.getElementById('wheel-canvas');
+        const wheelCtx = wheelCanvas.getContext('2d');
+        const questionText = document.getElementById('question-text');
+        const questionBox = document.getElementById('selected-question-box');
+        const historyList = document.getElementById('history-list');
+        const intermissionControl = document.getElementById('intermission-control');
+
+        let names = [];
+        let questions = [];
+        let ducks = [];
+        let gameState = 'setup';
+        let animationId;
+        
+        let reticle = { 
+            x: 0, 
+            y: 0, 
+            target: null, 
+            active: false, 
+            isLockingOn: false,
+            searchTimer: 0,
+            decisionTime: 0 
+        };
+
+        let wheelAngle = 0;
+        let wheelVelocity = 0;
+        let lastTickIndex = -1;
+        let isSpinning = false;
+        const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let loopInterval;
+
+        function playSound(freq, type, duration, vol = 0.1) {
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function startHuntMusic() {
+    stopMusic(); // Clear any existing music first
+    let step = 0;
+    loopInterval = setInterval(() => {
+        // SAFETY: If we are no longer hunting, stop immediately
+        if (gameState !== 'hunting') {
+            stopMusic();
+            return;
+        }
+
+        const intensity = (Date.now() - reticle.searchTimer) / reticle.decisionTime;
+        playSound(60, 'square', 0.1, 0.05);
+        if (step % 2 === 0) playSound(40, 'square', 0.1, 0.05);
+        
+        if (reticle.isLockingOn || (reticle.active && intensity > 0.6)) {
+            if (step % 4 === 0) playSound(300 + (intensity * 600), 'sawtooth', 0.05, 0.02);
+        }
+        step++;
+    }, 250); 
+}
+
+        function startQuestionMusic() {
+            stopMusic();
+            let step = 0;
+            const melody = [440, 493, 523, 587, 659, 523, 493, 440];
+            loopInterval = setInterval(() => {
+                playSound(110, 'triangle', 0.4, 0.1);
+                if (step % 2 === 0) {
+                    const note = melody[Math.floor(step/2) % melody.length];
+                    playSound(note, 'sine', 0.5, 0.08);
+                }
+                step++;
+            }, 500);
+        }
+
+       function stopMusic() {
+    if (loopInterval) {
+        clearInterval(loopInterval);
+        loopInterval = null;
+    }
+}
+
+        function playShoot() {
+            playSound(150, 'square', 0.1, 0.2);
+            setTimeout(() => playSound(50, 'sawtooth', 0.2, 0.1), 50);
+        }
+
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem('duckHuntPresets') || '[]');
+            historyList.innerHTML = '';
+            if (history.length === 0) {
+                historyList.innerHTML = '<p class="text-[8px] opacity-50">NO SAVED PRESETS</p>';
+                return;
+            }
+            history.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <span class="delete-history" onclick="deleteHistory(event, ${index})">X</span>
+                    <div onclick="applyHistory(${index})">
+                        <strong>${item.name}</strong><br>
+                        ${item.names.length} Names | ${item.questions.length} Ques.
+                    </div>
+                `;
+                historyList.appendChild(div);
+            });
+        }
+
+        function saveToHistory() {
+            const pName = presetNameInput.value.trim() || `HUNT ${new Date().toLocaleTimeString()}`;
+            const nData = nameInput.value.split('\n').filter(t => t.trim() !== "");
+            const qData = questionInput.value.split('\n').filter(t => t.trim() !== "");
+            if (nData.length === 0) return;
+            const history = JSON.parse(localStorage.getItem('duckHuntPresets') || '[]');
+            history.unshift({ name: pName, names: nData, questions: qData });
+            localStorage.setItem('duckHuntPresets', JSON.stringify(history.slice(0, 15)));
+            presetNameInput.value = '';
+            loadHistory();
+        }
+
+        function applyHistory(index) {
+            const history = JSON.parse(localStorage.getItem('duckHuntPresets') || '[]');
+            const item = history[index];
+            if (!item) return;
+            nameInput.value = item.names.join('\n');
+            questionInput.value = item.questions.join('\n');
+            presetNameInput.value = item.name;
+        }
+
+        function deleteHistory(e, index) {
+            e.stopPropagation();
+            let history = JSON.parse(localStorage.getItem('duckHuntPresets') || '[]');
+            history.splice(index, 1);
+            localStorage.setItem('duckHuntPresets', JSON.stringify(history));
+            loadHistory();
+        }
+
+        class Duck {
+            constructor(name) {
+                this.name = name;
+                this.scale = 1.8; 
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = canvas.height + 100;
+                this.targetX = Math.random() * canvas.width;
+                this.targetY = Math.random() * (canvas.height * 0.6);
+                this.speed = 3 + Math.random() * 3;
+                this.angle = 0;
+                this.flap = 0;
+                this.isDead = false;
+            }
+            update() {
+                if (this.isDead) {
+                    this.y += 15;
+                    this.angle += 0.3;
+                    return;
+                }
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 30) {
+                    this.targetX = Math.random() * canvas.width;
+                    this.targetY = Math.random() * (canvas.height * 0.5);
+                } else {
+                    this.x += (dx / dist) * this.speed;
+                    this.y += (dy / dist) * this.speed;
+                }
+                this.flap += 0.3;
+                this.angle = Math.atan2(dy, dx);
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                if (!this.isDead) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                    ctx.font = '8px "Press Start 2P"';
+                    const textWidth = ctx.measureText(this.name).width;
+                    ctx.fillRect(-textWidth/2 - 5, -55, textWidth + 10, 16);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(this.name, 0, -42);
+                }
+                if (Math.cos(this.angle) < 0) ctx.scale(-1, 1);
+                ctx.fillStyle = '#654321';
+                ctx.fillRect(-20 * this.scale, -15 * this.scale, 40 * this.scale, 20 * this.scale);
+                ctx.fillStyle = '#2e7d32';
+                ctx.fillRect(10 * this.scale, -25 * this.scale, 15 * this.scale, 15 * this.scale);
+                ctx.fillStyle = '#ffeb3b';
+                ctx.fillRect(25 * this.scale, -20 * this.scale, 10 * this.scale, 5 * this.scale);
+                ctx.fillStyle = '#8d6e63';
+                const flapY = Math.sin(this.flap) * (10 * this.scale / 2);
+                ctx.fillRect(-10 * this.scale, (-10 * this.scale) + flapY, 20 * this.scale, 10 * this.scale);
+                ctx.restore();
+            }
+        }
+
+        function drawWheel() {
+            const centerX = wheelCanvas.width / 2;
+            const centerY = wheelCanvas.height / 2;
+            const radius = centerX - 10;
+            const sliceAngle = (Math.PI * 2) / questions.length;
+            wheelCtx.clearRect(0, 0, wheelCanvas.width, wheelCanvas.height);
+            questions.forEach((q, i) => {
+                const angle = wheelAngle + i * sliceAngle;
+                wheelCtx.beginPath();
+                wheelCtx.moveTo(centerX, centerY);
+                wheelCtx.arc(centerX, centerY, radius, angle, angle + sliceAngle);
+                wheelCtx.fillStyle = colors[i % colors.length];
+                wheelCtx.fill();
+                wheelCtx.strokeStyle = "#fff";
+                wheelCtx.lineWidth = 2;
+                wheelCtx.stroke();
+                wheelCtx.save();
+                wheelCtx.translate(centerX, centerY);
+                wheelCtx.rotate(angle + sliceAngle / 2);
+                wheelCtx.fillStyle = "#fff";
+                wheelCtx.font = "bold 12px Arial";
+                wheelCtx.textAlign = "right";
+                const label = q.length > 15 ? q.substring(0, 12) + "..." : q;
+                wheelCtx.fillText(label, radius - 10, 5);
+                wheelCtx.restore();
+            });
+            wheelCtx.beginPath();
+            wheelCtx.arc(centerX, centerY, 20, 0, Math.PI * 2);
+            wheelCtx.fillStyle = "#fff";
+            wheelCtx.fill();
+            wheelCtx.stroke();
+        }
+
+        function spinWheel() {
+    if (isSpinning) return;
+    isSpinning = true;
+    lastTickIndex = -1; // Reset tick tracker
+    wheelVelocity = 0.5 + Math.random() * 0.5;
+    questionText.innerText = "SPINNING...";
+    
+    // Starting "thump" sound
+    playSound(200, 'square', 0.1, 0.05);
+}
+        function updateWheel() {
+    if (wheelVelocity > 0) {
+        wheelAngle += wheelVelocity;
+        wheelVelocity *= 0.985; // Friction
+
+        // --- ADD TICK SOUND LOGIC HERE ---
+        const sliceAngle = (Math.PI * 2) / questions.length;
+        // Calculate current slice under the pointer (pointing at the top: PI * 1.5)
+        let normalized = ((Math.PI * 1.5) - wheelAngle) % (Math.PI * 2);
+        if (normalized < 0) normalized += Math.PI * 2;
+        
+        let currentSliceIndex = Math.floor(normalized / sliceAngle);
+
+        // If the slice has changed, play a "tick" sound
+        if (currentSliceIndex !== lastTickIndex) {
+            // High pitched square wave for a "mechanical" click sound
+            // The speed of the ticks naturally slows down as wheelVelocity decreases
+            playSound(600 + (wheelVelocity * 200), 'square', 0.03, 0.03);
+            lastTickIndex = currentSliceIndex;
+        }
+        // ---------------------------------
+
+        if (wheelVelocity < 0.002) {
+            wheelVelocity = 0;
+            isSpinning = false;
+            determineWheelResult();
+        }
+        drawWheel();
+    }
+}
+
+        function determineWheelResult() {
+            const sliceAngle = (Math.PI * 2) / questions.length;
+            let normalized = ( (Math.PI * 1.5) - wheelAngle ) % (Math.PI * 2);
+            if (normalized < 0) normalized += Math.PI * 2;
+            const index = Math.floor(normalized / sliceAngle);
+            const winner = questions[index % questions.length];
+            questionText.innerText = winner;
+            playSound(880, 'triangle', 0.4, 0.15);
+        }
+
+        wheelCanvas.addEventListener('click', spinWheel);
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+       function startGame(syncedNames = null) {
+            const nameArr = nameInput.value.split('\n').filter(t => t.trim() !== "");
+            const quesArr = questionInput.value.split('\n').filter(t => t.trim() !== "");
+
+            if (nameArr.length === 0) return;
+            if (quesArr.length === 0) quesArr.push("No questions set!");
+
+            // 1. SYNC LOGIC
+            if (syncedNames) { 
+                names = syncedNames; 
+            } else { 
+                names = nameArr; 
+            }
+
+            questions = quesArr;
+            ducks = names.map(name => new Duck(name));
+
+            // 2. UI Transitions
+            setupScreen.style.display = 'none';
+            wheelContainer.style.display = 'block';
+            questionBox.style.display = 'block';
+            intermissionControl.style.display = 'block'; // Wait for user to click Start Hunting
+            winnerPopup.classList.remove('active');
+
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            gameState = 'intermission';
+            gameMsg.innerText = "READY FIELD";
+            
+            drawWheel();
+            if (!animationId) animate(); 
+        }
+
+        function startScanningSequence() {
+            intermissionControl.style.display = 'none';
+            startHunt();
+        }
+
+        function startHunt() {
+            gameState = 'hunting';
+            gameMsg.innerText = "SCANNING...";
+            reticle.active = true;
+            reticle.isLockingOn = false;
+            reticle.target = null; // Reset target
+            reticle.searchTimer = Date.now();
+            reticle.decisionTime = 5000 + (Math.random() * 5000); 
+            reticle.x = canvas.width / 2;
+            reticle.y = canvas.height / 2;
+            startHuntMusic(); 
+            pickRandomTarget();
+        }
+
+        function pickRandomTarget() {
+            // HOLD CHECK: Stop random movement if we aren't actively hunting
+            if (gameState !== 'hunting' || reticle.isLockingOn) return;
+
+            const alive = ducks.filter(d => !d.isDead);
+            if (alive.length > 0) {
+                if (Math.random() < 0.4) {
+                    reticle.target = alive[Math.floor(Math.random() * alive.length)];
+                } else {
+                    reticle.target = { x: Math.random() * canvas.width, y: Math.random() * (canvas.height * 0.6) };
+                }
+            }
+
+            if (gameState === 'hunting' && !reticle.isLockingOn) {
+                setTimeout(pickRandomTarget, 600 + Math.random() * 1000);
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ducks.forEach(duck => {
+                duck.update();
+                duck.draw();
+            });
+
+            // Only run reticle logic if in HUNTING state
+            if (gameState === 'hunting' && reticle.active && reticle.target) {
+                const elapsed = Date.now() - reticle.searchTimer;
+                
+                if (!reticle.isLockingOn && elapsed > reticle.decisionTime) {
+                    const alive = ducks.filter(d => !d.isDead);
+                    if (alive.length > 0) {
+                        reticle.isLockingOn = true;
+                        reticle.target = alive[Math.floor(Math.random() * alive.length)];
+                        gameMsg.innerText = "LOCK ON!";
+                    }
+                }
+
+                const dx = reticle.target.x - reticle.x;
+                const dy = reticle.target.y - reticle.y;
+                const ease = reticle.isLockingOn ? 0.18 : 0.04;
+                reticle.x += dx * ease;
+                reticle.y += dy * ease;
+
+                // --- 1. THE SNIPER SCOPE GRADIENT ---
+                ctx.save();
+                const scopeGradient = ctx.createRadialGradient(
+                    reticle.x, reticle.y, 45, 
+                    reticle.x, reticle.y, canvas.width / 1.2
+                );
+                scopeGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+                scopeGradient.addColorStop(0.15, 'rgba(0, 0, 0, 0.5)');
+                scopeGradient.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
+                ctx.fillStyle = scopeGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+
+                // --- 2. DRAW THE NEON GREEN RETICLE ---
+                const neonGreen = '#39FF14';
+                ctx.strokeStyle = reticle.isLockingOn ? (Math.floor(Date.now() / 100) % 2 === 0 ? '#ff0000' : neonGreen) : neonGreen;
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(reticle.x, reticle.y, 40, 0, Math.PI * 2);
+                ctx.moveTo(reticle.x - 55, reticle.y); ctx.lineTo(reticle.x + 55, reticle.y);
+                ctx.moveTo(reticle.x, reticle.y - 55); ctx.lineTo(reticle.x, reticle.y + 55);
+                ctx.stroke();
+
+                if (reticle.isLockingOn && Math.floor(Date.now() / 100) % 2 === 0) {
+                    playSound(800, 'sine', 0.02, 0.01);
+                }
+
+                // Hit Logic
+                if (reticle.isLockingOn && Math.abs(dx) < 12 && Math.abs(dy) < 12 && !reticle.target.isDead) {
+                    reticle.target.isDead = true;
+                    reticle.active = false;
+                    playShoot();
+                    setTimeout(() => showWinner(reticle.target.name), 800);
+                }
+            }
+
+            updateWheel();
+            duckCountSpan.innerText = ducks.filter(d => !d.isDead).length;
+            if (gameState !== 'setup') {
+                animationId = requestAnimationFrame(animate);
+            }
+        }
+
+    function showWinner(name) {
+    stopMusic(); // STOP HUNT MUSIC IMMEDIATELY
+    gameState = 'winner'; 
+    
+    reticle.active = false;
+    reticle.target = null;
+    gameMsg.innerText = "GOT ONE!";
+    winnerNameText.innerText = name;
+    winnerPopup.classList.add('active');
+    
+    const aliveCount = ducks.filter(d => !d.isDead).length;
+    document.getElementById('next-btn').style.display = aliveCount > 0 ? 'inline-block' : 'none';
+    
+    // Small delay before starting question music so sounds don't overlap
+    setTimeout(() => {
+        if (gameState === 'winner') startQuestionMusic();
+    }, 100);
+}
+        function continueGame() {
+            winnerPopup.classList.remove('active');
+            const wonName = winnerNameText.innerText;
+            
+            // Cleanup data
+            names = names.filter(n => n !== wonName);
+            nameInput.value = names.join('\n');
+            ducks = ducks.filter(d => !d.isDead);
+            
+            // HOLD: Go back to intermission
+            reticle.target = null;
+            reticle.active = false;
+            stopMusic();
+            
+            intermissionControl.style.display = 'block';
+            gameState = 'intermission';
+            gameMsg.innerText = "READY FIELD";
+        }
+
+        function resetToSetup() {
+            gameState = 'setup';
+            stopMusic();
+            cancelAnimationFrame(animationId);
+            animationId = null;
+            setupScreen.style.display = 'flex';
+            wheelContainer.style.display = 'none';
+            questionBox.style.display = 'none';
+            winnerPopup.classList.remove('active');
+            intermissionControl.style.display = 'none';
+            gameMsg.innerText = "WAITING...";
+            questionText.innerText = "SPIN THE WHEEL!"; 
+            loadHistory();
+        }
+
+        // --- MASTER SYNC SYSTEM V4 (Renamed & Optimized) ---
+        const syncChannel = new BroadcastChannel('duck_hunt_controls');
+        const isIframe = (window.self !== window.top);
+        let lastSyncedTarget = "";
+
+        document.addEventListener('input', (e) => {
+            if (e.target.id) syncChannel.postMessage({ type: 'INPUT_SYNC', id: e.target.id, value: e.target.value });
+        });
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('button');
+            if (btn && btn.onclick) {
+                const funcStr = btn.getAttribute('onclick');
+                if (funcStr) syncChannel.postMessage({ type: 'EXECUTE_FUNC', func: funcStr });
+            }
+        });
+
+        syncChannel.onmessage = (event) => {
+            const data = event.data;
+
+            if (data.type === 'SYNC_GAME_START' && isIframe) {
+                startGame(data.names);
+            }
+
+            if (data.type === 'SYNC_TARGET' && isIframe && typeof ducks !== 'undefined') {
+                const target = ducks.find(d => d.name === data.name);
+                if (target && !target.isDead) {
+                    reticle.active = true;
+                    reticle.target = target;
+                }
+            }
+
+            if (data.type === 'INPUT_SYNC') {
+                const el = document.getElementById(data.id);
+                if (el) { el.value = data.value; el.dispatchEvent(new Event('input')); }
+            }
+
+            if (data.type === 'EXECUTE_FUNC' || typeof data === 'string') {
+                const cmd = data.type === 'EXECUTE_FUNC' ? data.func : data;
+
+                if (cmd.includes('startGame') || cmd === 'LOAD_FIELD') {
+                    if (!isIframe) {
+                        startGame();
+                        syncChannel.postMessage({ type: 'SYNC_GAME_START', names: ducks.map(d => d.name) });
+                    }
+                }
+                else if (cmd.includes('startScanningSequence') || cmd === 'START_HUNT') {
+                    startScanningSequence();
+                }
+                else if (cmd.includes('continueGame') || cmd === 'NEXT') {
+                    continueGame();
+                }
+                else if (cmd.includes('spinWheel') || cmd === 'SPIN') {
+                    spinWheel();
+                }
+                else if (cmd === 'RELOAD') location.reload();
+                else if (cmd === 'GO_HOME') window.location.href = 'viewer.html';
+            }
+            if (data.type === 'NAVIGATE') window.location.href = data.url;
+        };
+
+        setInterval(() => {
+            if (!isIframe && gameState === 'hunting' && reticle.active && reticle.target) {
+                if (reticle.target.name && reticle.target.name !== lastSyncedTarget) {
+                    lastSyncedTarget = reticle.target.name;
+                    syncChannel.postMessage({ type: 'SYNC_TARGET', name: reticle.target.name });
+                }
+            }
+        }, 300);
+
+        syncChannel.postMessage({ type: 'PAGE_LOADED', url: window.location.pathname.split('/').pop() });
+
+    </script>
+</body>
+</html>
+
+

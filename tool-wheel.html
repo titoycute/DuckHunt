@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duck Hunt - Mega Wheel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="src/sniper.png">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Press+Start+2P', cursive;
+            user-select: none;
+            color: white;
+            
+            /* Enhanced Background Logic */
+            background-image: url('bg_field.gif');
+            background-size: cover;
+            background-position: center bottom;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            image-rendering: pixelated; /* Keeps pixel art sharp */
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .retro-panel {
+            background: rgba(0, 0, 0, 0.9);
+            border: 6px solid #fff;
+            padding: 30px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            text-align: center;
+        }
+
+        .retro-input {
+            background: #222;
+            border: 3px solid #555;
+            color: #0f0;
+            padding: 15px;
+            font-family: monospace;
+            outline: none;
+            width: 100%;
+        }
+
+        button {
+            background: #ff5722;
+            color: white;
+            padding: 12px 20px;
+            border: 4px solid #bf360c;
+            cursor: pointer;
+            font-family: 'Press+Start+2P', cursive;
+            font-size: 10px;
+            transition: all 0.1s;
+        }
+
+        button:hover { background: #ff7043; }
+        button:active { transform: scale(0.95); }
+        .secondary-btn { background: #4caf50; border-color: #2e7d32; }
+
+        #setup-screen {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+
+        #wheel-stage {
+            height: 100vh;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.3); /* Slight dim to help wheel pop */
+        }
+
+        #wheel-container {
+            position: relative;
+            width: 450px;
+            height: 450px;
+            margin-bottom: 20px;
+        }
+
+        #wheel-canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 8px solid #fff;
+            background: #fff;
+            box-shadow: 0 0 40px rgba(0,0,0,0.6);
+        }
+
+        .wheel-pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #ff0000;
+            z-index: 100;
+        }
+
+        /* Modal / Popup for choice */
+        #choice-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .history-item {
+            background: #333;
+            border: 2px solid #555;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 8px;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .delete-history {
+            color: #ff5722;
+            float: right;
+            font-weight: bold;
+            padding: 0 5px;
+        }
+
+        .floating-back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 9999;
+            background: #555;
+            color: white;
+            padding: 10px 15px;
+            border: 4px solid #333;
+            font-size: 10px;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="viewer.html" class="floating-back-btn">&lt; BACK</a>
+
+    <!-- SETUP SCREEN -->
+    <div id="setup-screen">
+        <div class="retro-panel max-w-2xl w-[90%]">
+            <h1 class="text-xl mb-6 text-yellow-400">MEGA WHEEL SETUP</h1>
+            <div class="flex gap-4 mb-4">
+                <div class="w-1/3 text-left">
+                    <p class="text-[10px] mb-2 text-blue-400">PRESETS</p>
+                    <div id="history-list" class="max-h-60 overflow-y-auto"></div>
+                </div>
+                <div class="flex-1 text-left">
+                    <p class="text-[10px] mb-2">ENTRIES (ONE PER LINE)</p>
+                    <textarea id="items-input" class="retro-input h-48" placeholder="Prize 1&#10;Prize 2..."></textarea>
+                </div>
+            </div>
+            <div class="flex gap-2 justify-center">
+                <input type="text" id="preset-name" placeholder="NAME" class="retro-input w-40 text-[10px]">
+                <button onclick="saveToHistory()" class="secondary-btn">SAVE</button>
+                <button onclick="initWheel()">LOAD WHEEL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WHEEL STAGE -->
+    <div id="wheel-stage">
+        <div id="wheel-container">
+            <div class="wheel-pointer"></div>
+            <canvas id="wheel-canvas" width="600" height="600" onclick="spinWheel()"></canvas>
+        </div>
+        <div class="flex gap-4">
+             <button onclick="location.reload()" class="bg-gray-700 border-gray-900">EDIT LIST</button>
+             <button onclick="spinWheel()" id="spin-btn-manual">SPIN AGAIN</button>
+        </div>
+    </div>
+
+    <!-- CHOICE MODAL -->
+    <div id="choice-modal">
+        <div class="retro-panel max-w-sm w-full">
+            <h2 class="text-white text-[10px] mb-2">THE WINNER IS:</h2>
+            <h1 id="modal-winner-name" class="text-2xl text-yellow-400 mb-6">NAME</h1>
+            <p class="text-[8px] text-gray-400 mb-6">REMOVE THIS ITEM FROM THE LIST?</p>
+            <div class="flex flex-col gap-3">
+                <button onclick="confirmRemoveWinner()" class="bg-red-600 border-red-800">YES, REMOVE IT</button>
+                <button onclick="closeChoiceModal()" class="secondary-btn">NO, KEEP IT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('wheel-canvas');
+        const ctx = canvas.getContext('2d');
+        const itemsInput = document.getElementById('items-input');
+        const choiceModal = document.getElementById('choice-modal');
+        const modalName = document.getElementById('modal-winner-name');
+        
+        let items = [];
+        let isSpinning = false;
+        let wheelAngle = 0;
+        let wheelVelocity = 0;
+        let lastTickIndex = -1;
+        let currentWinnerIdx = -1;
+
+        const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(freq, type, duration, vol = 0.1) {
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.start(); osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function initWheel() {
+            items = itemsInput.value.split('\n').filter(t => t.trim() !== "");
+            if (items.length < 2) return alert("Enter at least 2 items!");
+            
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('wheel-stage').style.display = 'flex';
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            drawWheel();
+            requestAnimationFrame(updateLoop);
+        }
+
+        function drawWheel() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = centerX - 15;
+            const sliceAngle = (Math.PI * 2) / items.length;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            items.forEach((item, i) => {
+                const angle = wheelAngle + i * sliceAngle;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle, angle + sliceAngle);
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(angle + sliceAngle / 2);
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 18px Arial";
+                ctx.textAlign = "right";
+                const label = item.length > 15 ? item.substring(0, 12) + "..." : item;
+                ctx.fillText(label, radius - 20, 10);
+                ctx.restore();
+            });
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 30, 0, Math.PI * 2);
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function spinWheel() {
+            if (isSpinning) return;
+            isSpinning = true;
+            lastTickIndex = -1;
+            wheelVelocity = 0.4 + Math.random() * 0.4;
+            playSound(200, 'square', 0.1, 0.05);
+        }
+
+        function updateLoop() {
+            if (wheelVelocity > 0) {
+                wheelAngle += wheelVelocity;
+                wheelVelocity *= 0.985;
+
+                const sliceAngle = (Math.PI * 2) / items.length;
+                let normalized = ((Math.PI * 1.5) - wheelAngle) % (Math.PI * 2);
+                if (normalized < 0) normalized += Math.PI * 2;
+                let currentSliceIndex = Math.floor(normalized / sliceAngle);
+
+                if (currentSliceIndex !== lastTickIndex) {
+                    playSound(600 + (wheelVelocity * 200), 'square', 0.03, 0.03);
+                    lastTickIndex = currentSliceIndex;
+                }
+
+                if (wheelVelocity < 0.002) {
+                    wheelVelocity = 0;
+                    isSpinning = false;
+                    currentWinnerIdx = currentSliceIndex % items.length;
+                    showWinnerChoice();
+                }
+                drawWheel();
+            }
+            requestAnimationFrame(updateLoop);
+        }
+
+        function showWinnerChoice() {
+            modalName.innerText = items[currentWinnerIdx];
+            choiceModal.style.display = 'flex';
+            playSound(880, 'triangle', 0.5, 0.1);
+        }
+
+        function confirmRemoveWinner() {
+            items.splice(currentWinnerIdx, 1);
+            itemsInput.value = items.join('\n');
+            closeChoiceModal();
+            if (items.length < 2) location.reload();
+            else drawWheel();
+        }
+
+        function closeChoiceModal() {
+            choiceModal.style.display = 'none';
+        }
+
+        // --- PRESET LOGIC ---
+        function saveToHistory() {
+            const name = document.getElementById('preset-name').value || "Wheel " + Date.now();
+            let h = JSON.parse(localStorage.getItem('duck_wheel_presets') || '[]');
+            h.push({name, data: itemsInput.value});
+            localStorage.setItem('duck_wheel_presets', JSON.stringify(h));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const l = document.getElementById('history-list'); l.innerHTML = "";
+            let h = JSON.parse(localStorage.getItem('duck_wheel_presets') || '[]');
+            h.forEach((x, i) => {
+                const d = document.createElement('div'); d.className="history-item";
+                d.innerHTML = `<span class="delete-history" onclick="deleteHistory(event, ${i})">X</span>${x.name}`;
+                d.onclick=()=>{ itemsInput.value=x.data; }; l.appendChild(d);
+            });
+        }
+
+        function deleteHistory(e, i) {
+            e.stopPropagation();
+            let h = JSON.parse(localStorage.getItem('duck_wheel_presets') || '[]');
+            h.splice(i, 1);
+            localStorage.setItem('duck_wheel_presets', JSON.stringify(h));
+            renderHistory();
+        }
+        renderHistory();
+
+        // --- SYNC SYSTEM ---
+        const syncChannel = new BroadcastChannel('duck_hunt_controls');
+        syncChannel.onmessage = (event) => {
+            const data = event.data;
+            if (data.type === 'EXECUTE_FUNC' || typeof data === 'string') {
+                const cmd = data.type === 'EXECUTE_FUNC' ? data.func : data;
+                if (cmd.includes('initWheel') || cmd === 'LOAD_FIELD') initWheel();
+                if (cmd.includes('spinWheel') || cmd === 'SPIN') spinWheel();
+                if (cmd === 'RELOAD') location.reload();
+                if (cmd === 'GO_HOME') window.location.href = 'viewer.html';
+                // Add sync for the modal buttons
+                if (cmd === 'REMOVE_WINNER') confirmRemoveWinner();
+                if (cmd === 'KEEP_WINNER') closeChoiceModal();
+            }
+            if (data.type === 'NAVIGATE') window.location.href = data.url;
+        };
+
+        syncChannel.postMessage({ type: 'PAGE_LOADED', url: window.location.pathname.split('/').pop() });
+    </script>
+</body>
+</html>

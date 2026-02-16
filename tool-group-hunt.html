@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duck Hunt Group Picker V3.9</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Press+Start+2P', cursive; user-select: none; }
+        #game-canvas { display: block; background-image: url('bg_field.gif'); background-size: cover; background-position: center; }
+        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .panel { pointer-events: auto; background: rgba(0, 0, 0, 0.9); border: 6px solid #fff; color: #fff; padding: 30px; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        #setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 500; }
+        textarea { font-family: monospace; width: 100%; height: 150px; margin: 10px 0; padding: 15px; background: #222; color: #0f0; border: 3px solid #555; font-size: 11px; outline: none; }
+        button { background: #ff5722; color: white; padding: 12px 20px; border: 4px solid #bf360c; cursor: pointer; font-family: 'Press+Start+2P', cursive; font-size: 10px; transition: transform 0.1s; }
+        button:hover { background: #ff7043; }
+        .secondary-btn { background: #4caf50; border-color: #2e7d32; }
+        #winner-popup { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); z-index: 400; width: 90%; max-width: 800px; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #winner-popup.active { transform: translate(-50%, -50%) scale(1); }
+        #winner-name { font-size: 3rem; margin: 20px 0; color: #00ff00; text-shadow: 4px 4px #000; animation: pulse 1s infinite; }
+        #presenter-name { font-size: 1.8rem; color: #ffeb3b; min-height: 40px; }
+        .status-bar { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 40px; color: white; font-size: 10px; }
+        #intermission-control { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); z-index: 300; display: none; }
+        #csv-upload { display: none; }
+        .csv-label { background: #2196f3; border: 4px solid #0d47a1; padding: 10px; cursor: pointer; display: inline-block; font-size: 9px; margin-bottom: 5px; }
+        .history-item { background: #333; border: 2px solid #555; padding: 8px; margin-bottom: 8px; font-size: 8px; cursor: pointer; }
+   .delete-history {
+    color: #ff5722;
+    float: right;
+    margin-left: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 5px;
+}
+.delete-history:hover {
+    background: #ff5722;
+    color: white;
+}
+        /* Floating Back Button Style */
+.floating-back-btn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 9999; /* Ensures it stays above all other UI layers */
+    background: #555; /* Neutral grey to distinguish it from action buttons */
+    color: white;
+    padding: 10px 15px;
+    border: 4px solid #333;
+    font-family: 'Press+Start+2P', cursive;
+    font-size: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: transform 0.1s;
+}
+
+.floating-back-btn:hover {
+    background: #777;
+}
+
+.floating-back-btn:active {
+    transform: translateY(4px);
+}
+   
+   </style>
+</head>
+<body>
+    <a href="viewer.html" class="floating-back-btn">
+    &lt; BACK
+</a>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="setup-screen" class="ui-overlay">
+        <div class="panel max-w-[900px] w-[95%]">
+            <h1 class="text-lg mb-4">DUCK GROUP HUNT V3.9</h1>
+            <div class="flex flex-row gap-4">
+                <div id="history-panel" class="w-48 border-r-2 border-gray-600 pr-4 text-left overflow-y-auto max-h-64">
+                    <p class="text-[9px] text-yellow-400 mb-2">PRESETS</p>
+                    <div id="history-list"></div>
+                </div>
+                <div class="flex-1 text-left">
+                    <label for="csv-upload" class="csv-label">UPLOAD CSV</label>
+                    <input type="file" id="csv-upload" accept=".csv">
+                    <textarea id="group-input" placeholder="Team Alpha, Alice&#10;Team Alpha, Bob..."></textarea>
+                    <div class="flex gap-2">
+                        <input type="text" id="preset-name" placeholder="PRESET NAME" class="bg-black border-2 border-white p-2 text-[10px] text-white w-40">
+                        <button onclick="saveToHistory()" class="secondary-btn">SAVE</button>
+                        <button onclick="startGame()">LOAD FIELD</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="intermission-control">
+        <button onclick="startScanningSequence()" style="font-size: 20px; padding: 20px 40px;">START HUNTING!</button>
+    </div>
+
+    <div id="winner-popup" class="panel">
+        <h2 class="text-white text-sm">TARGET ACQUIRED:</h2>
+        <div id="winner-name">GROUP</div>
+        <div id="presenter-zone" class="border-2 border-dashed border-gray-700 p-6 my-4">
+            <div id="presenter-name">---</div>
+            <button id="pick-presenter-btn" onclick="animatePresenterSelection()" class="mt-4 secondary-btn">PICK PRESENTER</button>
+        </div>
+        <div class="flex justify-center gap-4">
+            <button onclick="resetToSetup()">EDIT</button>
+            <button onclick="continueGame()">NEXT TARGET</button>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span>GROUPS ALIVE: <span id="duck-count">0</span></span>
+        <span id="game-msg">WAITING...</span>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const groupInput = document.getElementById('group-input');
+        const setupScreen = document.getElementById('setup-screen');
+        const winnerPopup = document.getElementById('winner-popup');
+        const winnerNameText = document.getElementById('winner-name');
+        const presenterText = document.getElementById('presenter-name');
+        const presenterBtn = document.getElementById('pick-presenter-btn');
+        const duckCountSpan = document.getElementById('duck-count');
+        const gameMsg = document.getElementById('game-msg');
+        const intermissionControl = document.getElementById('intermission-control');
+        const csvUpload = document.getElementById('csv-upload');
+
+        let groupMap = {}; 
+        let ducks = [];
+        let gameState = 'setup';
+        
+        let reticle = { 
+            x: 0, y: 0, 
+            targetX: 0, targetY: 0, 
+            lockObj: null, 
+            active: false, 
+            isLockingOn: false, 
+            searchTimer: 0, 
+            decisionTime: 0 
+        };
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(freq, type, duration, vol = 0.1) {
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.start(); osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        class Duck {
+            constructor(name) {
+                this.name = name;
+                this.scale = 1.8;
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = canvas.height + 100;
+                this.tx = Math.random() * canvas.width;
+                this.ty = Math.random() * (canvas.height * 0.5);
+                this.speed = 2 + Math.random() * 2;
+                this.flap = 0;
+                this.isDead = false;
+            }
+            update() {
+                if (this.isDead) { this.y += 15; return; }
+                const dx = this.tx - this.x;
+                const dy = this.ty - this.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 30) {
+                    this.tx = Math.random() * canvas.width;
+                    this.ty = Math.random() * (canvas.height * 0.5);
+                }
+                this.x += (dx/dist) * this.speed;
+                this.y += (dy/dist) * this.speed;
+                this.flap += 0.3;
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                if (!this.isDead) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.font = '8px "Press Start 2P"';
+                    const tw = ctx.measureText(this.name).width;
+                    ctx.fillRect(-tw/2 - 5, -55, tw + 10, 16);
+                    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.fillText(this.name, 0, -42);
+                }
+                if (this.tx < this.x) ctx.scale(-1, 1);
+                ctx.fillStyle = '#654321'; ctx.fillRect(-20*this.scale, -15*this.scale, 40*this.scale, 20*this.scale);
+                ctx.fillStyle = '#2e7d32'; ctx.fillRect(10*this.scale, -25*this.scale, 15*this.scale, 15*this.scale);
+                ctx.fillStyle = '#ffeb3b'; ctx.fillRect(25*this.scale, -20*this.scale, 10*this.scale, 5*this.scale);
+                ctx.fillStyle = '#8d6e63';
+                const flapY = Math.sin(this.flap) * (5 * this.scale);
+                ctx.fillRect(-10*this.scale, (-10*this.scale)+flapY, 20*this.scale, 10*this.scale);
+                ctx.restore();
+            }
+        }
+
+       function startGame(syncedNames = null) {
+    // 1. Always process the input to build the groupMap (needed for picking presenters)
+    const lines = groupInput.value.split('\n').filter(l => l.trim() !== "");
+    groupMap = {};
+    lines.forEach(line => {
+        const [g, m] = line.split(',').map(s => s.trim());
+        if (g) { 
+            if (!groupMap[g]) groupMap[g] = []; 
+            if (m) groupMap[g].push(m); 
+        }
+    });
+
+    // 2. SYNC LOGIC: 
+    // If syncedNames is provided (from the Big Screen), use that list.
+    // Otherwise, create the list from the groupMap keys.
+    if (syncedNames) { ducks = syncedNames.map(n => new Duck(n)); } 
+    else { ducks = Object.keys(groupMap).map(n => new Duck(n)); }
+
+    // 3. UI Transition
+    setupScreen.style.display = 'none';
+    if (typeof intermissionControl !== 'undefined') {
+        intermissionControl.style.display = 'block';
+    }
+    
+    gameState = 'playing';
+
+    // 4. Audio and Animation
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    resize(); 
+    
+    // Start the animation loop
+    animate();
+}
+
+
+
+        function startScanningSequence() {
+            intermissionControl.style.display = 'none';
+            reticle.active = true;
+            reticle.isLockingOn = false;
+            reticle.lockObj = null;
+            reticle.x = canvas.width / 2;
+            reticle.y = canvas.height / 2;
+            reticle.searchTimer = Date.now();
+            reticle.decisionTime = 4000 + (Math.random() * 3000); 
+            gameMsg.innerText = "SCANNING TARGETS...";
+            pickNextScanTarget();
+        }
+
+        function pickNextScanTarget() {
+            if (!reticle.active || reticle.isLockingOn) return;
+            const alive = ducks.filter(d => !d.isDead);
+            if (alive.length > 0) {
+                const stalkTarget = alive[Math.floor(Math.random() * alive.length)];
+                reticle.targetX = stalkTarget.x;
+                reticle.targetY = stalkTarget.y;
+                playSound(200, 'sine', 0.05, 0.03);
+            }
+            setTimeout(pickNextScanTarget, 400 + Math.random() * 500);
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+           ctx.fillStyle = 'rgba(46, 125, 50, 0.0)'; 
+ctx.fillRect(0, canvas.height * 0.75, canvas.width, canvas.height * 0.25);
+            ducks.forEach(d => { d.update(); d.draw(); });
+
+            if (reticle.active) {
+                const elapsed = Date.now() - reticle.searchTimer;
+                const alive = ducks.filter(d => !d.isDead);
+                
+                // Final Lock-On Logic
+                if (!reticle.isLockingOn && elapsed > reticle.decisionTime) {
+                    if (alive.length > 0) {
+                        reticle.isLockingOn = true;
+                        reticle.lockObj = alive[Math.floor(Math.random() * alive.length)];
+                        gameMsg.innerText = "LOCK ACQUIRED!";
+                    }
+                }
+
+                if (reticle.isLockingOn && reticle.lockObj) {
+                    reticle.targetX = reticle.lockObj.x;
+                    reticle.targetY = reticle.lockObj.y;
+                }
+
+                const ease = reticle.isLockingOn ? 0.18 : 0.06;
+                reticle.x += (reticle.targetX - reticle.x) * ease;
+                reticle.y += (reticle.targetY - reticle.y) * ease;
+
+                // --- 1. NEON SCOPE OVERLAY ---
+                ctx.save();
+                const scopeGradient = ctx.createRadialGradient(
+                    reticle.x, reticle.y, 45,             
+                    reticle.x, reticle.y, canvas.width / 1.1 
+                );
+                scopeGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');     
+                scopeGradient.addColorStop(0.15, 'rgba(0, 0, 0, 0.6)'); 
+                scopeGradient.addColorStop(1, 'rgba(0, 0, 0, 0.98)');   
+                ctx.fillStyle = scopeGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+
+                // --- 2. NEON RETICLE DRAWING ---
+                const neonGreen = '#39FF14';
+                // Flash Red/Green when locking
+                ctx.strokeStyle = reticle.isLockingOn ? (Math.floor(Date.now() / 100) % 2 === 0 ? '#ff0000' : neonGreen) : neonGreen;
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(reticle.x, reticle.y, 40, 0, Math.PI * 2); // Scope Circle
+                ctx.moveTo(reticle.x - 55, reticle.y); ctx.lineTo(reticle.x + 55, reticle.y); // Horizontal
+                ctx.moveTo(reticle.x, reticle.y - 55); ctx.lineTo(reticle.x, reticle.y + 55); // Vertical
+                ctx.stroke();
+
+                // Shooting Trigger
+                if (reticle.isLockingOn && Math.abs(reticle.x - reticle.targetX) < 10 && !reticle.lockObj.isDead) {
+                    reticle.lockObj.isDead = true;
+                    reticle.active = false;
+                    playSound(100, 'sawtooth', 0.4, 0.2);
+                    setTimeout(() => showWinner(reticle.lockObj.name), 800);
+                }
+            }
+
+            duckCountSpan.innerText = ducks.filter(d => !d.isDead).length;
+            if (gameState !== 'setup') requestAnimationFrame(animate);
+        }
+
+        function showWinner(groupName) {
+            winnerNameText.innerText = groupName;
+            presenterText.innerText = "---";
+            presenterBtn.style.display = "inline-block";
+            winnerPopup.classList.add('active');
+            gameMsg.innerText = "TARGET NEUTRALIZED";
+        }
+
+        function animatePresenterSelection() {
+            const members = groupMap[winnerNameText.innerText] || ["Empty"];
+            presenterBtn.style.display = "none";
+            let spins = 0;
+            const max = 25;
+            const iv = setInterval(() => {
+                presenterText.innerText = members[Math.floor(Math.random() * members.length)];
+                playSound(500 + (spins * 20), 'sine', 0.05, 0.05);
+                if (spins++ > max) {
+                    clearInterval(iv);
+                    playSound(800, 'triangle', 0.5);
+                }
+            }, 80);
+        }
+
+        function continueGame() {
+            winnerPopup.classList.remove('active');
+            ducks = ducks.filter(d => !d.isDead);
+            if (ducks.length === 0) resetToSetup();
+            else intermissionControl.style.display = 'block';
+        }
+
+        function resetToSetup() {
+            gameState = 'setup';
+            setupScreen.style.display = 'flex';
+            winnerPopup.classList.remove('active');
+            intermissionControl.style.display = 'none';
+        }
+
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        csvUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => { groupInput.value = ev.target.result; };
+            reader.readAsText(file);
+        });
+
+        function saveToHistory() {
+            const name = document.getElementById('preset-name').value || "Hunt " + Date.now();
+            let h = JSON.parse(localStorage.getItem('duck_presets') || '[]');
+            h.push({name, data: groupInput.value});
+            localStorage.setItem('duck_presets', JSON.stringify(h));
+            renderHistory();
+        }
+
+        function deleteHistory(event, index) {
+            // Prevent the click from triggering the "Load Preset" action
+            event.stopPropagation();
+            
+            if (confirm("Delete this preset?")) {
+                let h = JSON.parse(localStorage.getItem('duck_presets') || '[]');
+                h.splice(index, 1); // Remove the item at the specific index
+                localStorage.setItem('duck_presets', JSON.stringify(h));
+                renderHistory(); // Refresh the list
+            }
+        }
+
+        function renderHistory() {
+            const l = document.getElementById('history-list'); 
+            l.innerHTML = "";
+            let h = JSON.parse(localStorage.getItem('duck_presets') || '[]');
+            
+            h.forEach((x, index) => {
+                const d = document.createElement('div'); 
+                d.className = "history-item"; 
+                
+                // Add the Name and the Delete Button
+                d.innerHTML = `
+                    <span class="delete-history" onclick="deleteHistory(event, ${index})">X</span>
+                    <div class="preset-click-area">${x.name}</div>
+                `;
+                
+                // Clicking the name loads the data
+                d.querySelector('.preset-click-area').onclick = () => { 
+                    groupInput.value = x.data; 
+                };
+                
+                l.appendChild(d);
+            });
+        }
+        renderHistory();
+
+        
+// --- MASTER SYNC SYSTEM V4 (Performance Optimized) ---
+const syncChannel = new BroadcastChannel('duck_hunt_controls');
+const isIframe = (window.self !== window.top);
+let lastSyncedTarget = "";
+
+// 1. BROADCAST: Only the Big Screen (Main Window) sends game results
+document.addEventListener('input', (e) => {
+    if (e.target.id) syncChannel.postMessage({ type: 'INPUT_SYNC', id: e.target.id, value: e.target.value });
+});
+
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (btn && btn.onclick) {
+        const funcStr = btn.getAttribute('onclick');
+        if (funcStr) syncChannel.postMessage({ type: 'EXECUTE_FUNC', func: funcStr });
+    }
+});
+
+// 2. LISTEN: Execute commands
+syncChannel.onmessage = (event) => {
+    const data = event.data;
+
+    if (data.type === 'SYNC_GAME_START' && isIframe) {
+        if (typeof initGame === 'function') initGame(data.names);
+        else if (typeof startGame === 'function') startGame(data.names);
+    }
+
+    if (data.type === 'SYNC_TARGET' && isIframe && typeof ducks !== 'undefined') {
+        const target = ducks.find(d => d.name === data.name);
+        if (target && !target.isDead) {
+            reticle.active = true;
+            reticle.target = target;
+            if (typeof reticle.lockObj !== 'undefined') reticle.lockObj = target;
+        }
+    }
+
+    if (data.type === 'INPUT_SYNC') {
+        const el = document.getElementById(data.id);
+        if (el) { el.value = data.value; el.dispatchEvent(new Event('input')); }
+    }
+
+    if (data.type === 'EXECUTE_FUNC' || typeof data === 'string') {
+        const cmd = data.type === 'EXECUTE_FUNC' ? data.func : data;
+
+        if (cmd.includes('initGame') || cmd.includes('startGame') || cmd === 'LOAD_FIELD') {
+            if (!isIframe) {
+                if (typeof initGame === 'function') initGame(); else startGame();
+                const nameList = ducks.map(d => d.name);
+                syncChannel.postMessage({ type: 'SYNC_GAME_START', names: nameList });
+            }
+        }
+        else if (cmd.includes('triggerHunt') || cmd.includes('startScanningSequence') || cmd === 'START_HUNT') {
+            if (typeof triggerHunt === 'function') triggerHunt();
+            else if (typeof startScanningSequence === 'function') startScanningSequence();
+        }
+        else if (cmd.includes('nextGroup') || cmd.includes('continueGame') || cmd === 'NEXT') {
+            if (typeof nextGroup === 'function') nextGroup(); else if (typeof continueGame === 'function') continueGame();
+        }
+        else if (cmd.includes('spinWheel') || cmd === 'SPIN') { if (typeof spinWheel === 'function') spinWheel(); }
+        else if (cmd.includes('saveToHistory') || cmd.includes('saveToStorage') || cmd === 'SAVE_PRESET') {
+            if (typeof saveToHistory === 'function') saveToHistory(); else if (typeof saveToStorage === 'function') saveToStorage();
+        }
+        else if (cmd.includes('loadFromStorage') || cmd.includes('loadHistory') || cmd === 'LOAD_DATA') {
+            if (typeof loadFromStorage === 'function') loadFromStorage(); else if (typeof loadHistory === 'function') loadHistory();
+        }
+        else if (cmd === 'RELOAD') location.reload();
+        else if (cmd === 'GO_HOME') window.location.href = 'viewer.html';
+    }
+
+    if (data.type === 'NAVIGATE') window.location.href = data.url;
+};
+
+// 3. OPTIMIZED TARGET SYNC: Only send if the target changes (Prevents Freezing)
+setInterval(() => {
+    if (!isIframe && typeof reticle !== 'undefined' && reticle.active) {
+        const t = reticle.target || reticle.lockObj;
+        if (t && t.name && t.name !== lastSyncedTarget) {
+            lastSyncedTarget = t.name;
+            syncChannel.postMessage({ type: 'SYNC_TARGET', name: t.name });
+        }
+    }
+}, 300); // Slower interval is much safer for performance
+
+syncChannel.postMessage({ type: 'PAGE_LOADED', url: window.location.pathname.split('/').pop() });
+    </script>
+</body>
+</html>

@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Duck Hunt Group Maker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Press+Start+2P', cursive;
+            user-select: none;
+            color: white;
+        }
+canvas {
+    display: block;
+    image-rendering: pixelated;
+    /* Essential background properties */
+    background-image: url('bg_field.gif');
+    background-size: cover;      /* Scales image to fill entire area */
+    background-position: center; /* Keeps it centered */
+    background-repeat: no-repeat;
+    background-attachment: fixed; /* Prevents background from moving */
+    
+    /* Ensure canvas fills the viewport */
+    width: 100vw;
+    height: 100vh;
+}
+
+        .retro-panel {
+            background: #000000b4;
+            border: 4px solid #fff;
+            padding: 20px;
+            box-shadow: 8px 8px 0px #555;
+        }
+
+        .retro-input {
+            background: #222;
+            border: 2px solid #fff;
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+            outline: none;
+        }
+
+        .retro-btn {
+            background: #ff5722;
+            color: white;
+            padding: 10px 20px;
+            border: 4px solid #bf360c;
+            font-family: 'Press+Start+2P', cursive;
+            font-size: 10px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .retro-btn:active { transform: translateY(4px); box-shadow: none; }
+        .retro-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        #setup-screen, #summary-screen, #zoom-modal {
+            pointer-events: auto;
+            z-index: 100;
+        }
+
+        .hidden { display: none !important; }
+
+        #group-display {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        .group-box {
+            background: rgba(0,0,0,0.8);
+            border: 2px solid #fff;
+            padding: 10px;
+            flex: 1;
+            font-size: 8px;
+            max-height: 180px;
+            overflow-y: auto;
+            cursor: zoom-in;
+            transition: transform 0.2s;
+        }
+        .group-box:hover { transform: translateY(-5px); background: rgba(30,30,30,0.9); }
+
+        .active-group { border-color: #ffeb3b; box-shadow: 0 0 15px #ffeb3b; }
+
+        #announcement {
+            position: absolute;
+            top: 20%;
+            font-size: 24px;
+            color: #ffeb3b;
+            text-shadow: 4px 4px #000;
+            text-align: center;
+            pointer-events: none;
+            z-index: 200;
+        }
+
+        #zoom-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        /* Floating Back Button Style */
+.floating-back-btn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 9999; /* Ensures it stays above all other UI layers */
+    background: #555; /* Neutral grey to distinguish it from action buttons */
+    color: white;
+    padding: 10px 15px;
+    border: 4px solid #333;
+    font-family: 'Press+Start+2P', cursive;
+    font-size: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: transform 0.1s;
+}
+
+.floating-back-btn:hover {
+    background: #777;
+}
+
+.floating-back-btn:active {
+    transform: translateY(4px);
+}
+    </style>
+</head>
+<body>
+
+    <a href="viewer.html" class="floating-back-btn">
+    &lt; BACK
+</a>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="setup-screen" class="retro-panel max-w-lg w-full text-center">
+            <h1 class="text-xl mb-6 text-yellow-400">DUCK GROUPER PRO</h1>
+            <div class="mb-4 text-left">
+                <label class="text-[10px] block mb-2 text-blue-400">SESSION STATUS</label>
+                <div id="save-status" class="text-[8px] mb-2 text-gray-400">Ready to Hunt.</div>
+                <label class="text-[10px] block mb-2">NAMES (ONE PER LINE)</label>
+                <textarea id="names-input" class="retro-input w-full h-32" placeholder="ALICE&#10;BOB&#10;CHARLIE..."></textarea>
+            </div>
+            <div class="mb-6 text-left flex gap-4">
+                <div class="flex-1">
+                    <label class="text-[10px] block mb-2">GROUPS</label>
+                    <input type="number" id="group-count" value="2" min="1" class="retro-input w-full">
+                </div>
+                <div class="flex-1 flex items-end">
+                    <button onclick="loadFromStorage()" class="retro-btn w-full bg-blue-600 border-blue-800">LOAD LAST</button>
+                </div>
+            </div>
+            <button onclick="initGame()" class="retro-btn w-full text-lg">START HUNT</button>
+        </div>
+
+        <div id="announcement" class="hidden"></div>
+
+        <div id="group-display" class="hidden"></div>
+
+        <div id="controls" class="hidden absolute bottom-52 pointer-events-auto flex flex-col items-center gap-4">
+            <div id="hunt-status" class="text-[10px] bg-black/50 p-2 border border-white hidden">HUNTING IN PROGRESS...</div>
+            <button id="hunt-btn" onclick="triggerHunt()" class="retro-btn py-4 px-8 text-lg">START AUTOMATIC HUNT</button>
+            <button id="next-group-btn" onclick="nextGroup()" class="hidden retro-btn py-4 px-8 text-lg bg-blue-600 border-blue-800">START NEXT GROUP</button>
+            <button id="finish-btn" onclick="showSummary()" class="hidden retro-btn py-4 px-8 text-lg bg-green-600 border-green-800">VIEW FINAL SUMMARY</button>
+        </div>
+
+        <div id="summary-screen" class="hidden retro-panel max-w-2xl w-full">
+            <h2 class="text-xl mb-4 text-center text-yellow-400">FINAL ROSTER</h2>
+            <div id="summary-list" class="grid grid-cols-2 gap-4 mb-6 max-h-80 overflow-y-auto p-2"></div>
+            <div class="flex gap-4">
+                <button onclick="exportToCSV()" class="retro-btn flex-1 bg-green-600 border-green-800">EXPORT CSV</button>
+                <button onclick="location.reload()" class="retro-btn flex-1">NEW GAME</button>
+            </div>
+        </div>
+
+        <div id="zoom-modal" class="hidden" onclick="this.classList.add('hidden')">
+            <div class="retro-panel max-w-md w-full text-center">
+                <h2 id="zoom-title" class="text-xl mb-4 text-yellow-400"></h2>
+                <div id="zoom-content" class="text-lg leading-loose space-y-2"></div>
+                <p class="mt-6 text-[8px] text-gray-500">CLICK ANYWHERE TO CLOSE</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let audioCtx;
+        
+        // Game State
+        let names = [];
+        let groups = [];
+        let ducks = [];
+        let currentGroupIdx = 0;
+        let reticle = { x: 0, y: 0, target: null, active: false, locking: false };
+        let animationId;
+        let musicTicker = 0;
+        let isAutoHunting = false;
+        let targetGroupSize = 0;
+
+        // Sound Engine
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(freq, type, duration, vol = 0.1) {
+            if(!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.connect(audioCtx.destination);
+            osc.connect(gain);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playBGM() {
+            musicTicker++;
+            const rhythm = isAutoHunting ? 15 : 40;
+            if (musicTicker % rhythm === 0) {
+                const scale = isAutoHunting ? [146.83, 155.56, 174.61, 196.00] : [261.63, 329.63, 392.00, 523.25];
+                const note = scale[Math.floor(Math.random() * scale.length)];
+                const type = isAutoHunting ? 'sawtooth' : 'triangle';
+                const vol = isAutoHunting ? 0.05 : 0.03;
+                playSound(note, type, isAutoHunting ? 0.2 : 0.6, vol);
+            }
+            if (isAutoHunting && musicTicker % 30 === 0) {
+                playSound(60, 'square', 0.1, 0.06);
+            }
+        }
+
+        class Duck {
+            constructor(name) {
+                this.name = name;
+                this.isDead = false;
+                this.facingRight = true;
+                this.scale = 2.0; // SCALE CHANGE HERE (from original 1.0)
+                this.reset();
+                this.y = canvas.height + 50;
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.targetX = Math.random() * canvas.width;
+                this.targetY = Math.random() * (canvas.height * 0.6);
+                this.speed = 1.8 + Math.random() * 2.5;
+                this.flap = 0;
+            }
+            update() {
+                if (this.isDead) {
+                    this.y += 18;
+                    return;
+                }
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (Math.abs(dx) > 0.5) this.facingRight = dx > 0;
+                if (dist < 10) {
+                    this.targetX = Math.random() * canvas.width;
+                    this.targetY = Math.random() * (canvas.height * 0.6);
+                } else {
+                    this.x += (dx / dist) * this.speed;
+                    this.y += (dy / dist) * this.speed;
+                }
+                this.flap += 0.25;
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                const s = this.scale;
+                if (!this.facingRight) ctx.scale(-1, 1);
+                
+                if (!this.isDead) {
+                    ctx.save();
+                    if (!this.facingRight) ctx.scale(-1, 1);
+                    ctx.fillStyle = 'black';
+                    // Scale font slightly with duck size
+                    ctx.font = `${8 * (s/2)}px monospace`;
+                    const tw = ctx.measureText(this.name).width;
+                    // Adjusted Y offset for larger duck head
+                    ctx.fillRect(-tw/2 - 2, -18 * s - 15, tw + 4, 12);
+                    ctx.fillStyle = 'white';
+                    ctx.fillText(this.name, -tw/2, -18 * s - 6);
+                    ctx.restore();
+                }
+                
+                // Drawing body parts multiplied by scale 's'
+                ctx.fillStyle = this.isDead ? '#f44336' : '#6d4c41';
+                ctx.fillRect(-15 * s, -10 * s, 30 * s, 15 * s); // Body
+                
+                ctx.fillStyle = '#2e7d32';
+                ctx.fillRect(5 * s, -18 * s, 12 * s, 10 * s);  // Head
+                
+                ctx.fillStyle = '#ffeb3b';
+                ctx.fillRect(15 * s, -15 * s, 8 * s, 4 * s);   // Beak
+                
+                const wingPos = (Math.sin(this.flap) * 10) * (s/2);
+                ctx.fillStyle = '#8d6e63';
+                ctx.fillRect(-8 * s, (-10 * s) + wingPos, 16 * s, 8 * s); // Wing
+                
+                ctx.restore();
+            }
+        }
+
+        function initGame(syncedNames = null) {
+    initAudio();
+    const rawNames = document.getElementById('names-input').value.split('\n').filter(n => n.trim());
+    if (syncedNames) { names = syncedNames; } 
+    else { names = rawNames.sort(() => Math.random() - 0.5); }
+
+            names = rawNames.sort(() => Math.random() - 0.5);
+            groups = Array.from({ length: numGroups }, () => []);
+            
+            // Calculate base group size
+            targetGroupSize = Math.floor(names.length / numGroups);
+            
+            ducks = names.map(n => new Duck(n));
+            saveToStorage();
+
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('group-display').classList.remove('hidden');
+            document.getElementById('controls').classList.remove('hidden');
+            
+            updateGroupUI();
+            resize();
+            gameLoop();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            announce(`ROUND 1: GROUP 1`);
+        }
+
+        function updateGroupUI() {
+            const container = document.getElementById('group-display');
+            container.innerHTML = '';
+            groups.forEach((g, i) => {
+                const div = document.createElement('div');
+                div.className = `group-box ${i === currentGroupIdx ? 'active-group' : ''}`;
+                div.onclick = () => zoomGroup(i);
+                div.innerHTML = `<div class="text-yellow-400 mb-1 border-b border-white/20 pb-1">G${i+1}</div>` + 
+                                g.map(m => `<div class="py-1"> ${m}</div>`).join('');
+                container.appendChild(div);
+            });
+        }
+
+        function zoomGroup(idx) {
+            const modal = document.getElementById('zoom-modal');
+            const title = document.getElementById('zoom-title');
+            const content = document.getElementById('zoom-content');
+            title.innerText = `GROUP ${idx + 1}`;
+            content.innerHTML = groups[idx].map(n => `<div>${n}</div>`).join('');
+            modal.classList.remove('hidden');
+        }
+
+        function announce(text) {
+            const el = document.getElementById('announcement');
+            el.innerText = text;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 2000);
+            playSound(523.25, 'square', 0.2);
+        }
+
+        async function triggerHunt() {
+            if (reticle.active || ducks.filter(d => !d.isDead).length === 0) return;
+            isAutoHunting = true;
+            document.getElementById('hunt-btn').classList.add('hidden');
+            document.getElementById('hunt-status').classList.remove('hidden');
+            await performHuntCycle();
+        }
+
+        async function performHuntCycle() {
+            const alive = ducks.filter(d => !d.isDead);
+            if (alive.length === 0) return;
+
+            reticle.active = true;
+            reticle.locking = false;
+            
+            // Thrilling targeting: Switch targets several times
+            const switches = 3 + Math.floor(Math.random() * 4);
+            const cycleTime = (5000 + Math.random() * 4000) / switches;
+
+            for (let i = 0; i < switches; i++) {
+                const targets = ducks.filter(d => !d.isDead);
+                reticle.target = targets[Math.floor(Math.random() * targets.length)];
+                playSound(300 + (i * 50), 'sawtooth', 0.1, 0.05);
+                await new Promise(r => setTimeout(r, cycleTime));
+            }
+
+            reticle.locking = true;
+            playSound(800, 'square', 0.1, 0.1);
+            await new Promise(r => setTimeout(r, 600));
+
+            shoot();
+            
+            await new Promise(r => setTimeout(r, 1000));
+            
+            // Determine if group is "full" based on auto-division
+            // For the last group, it takes everything remaining
+            const isLastGroup = currentGroupIdx === groups.length - 1;
+            const currentSize = groups[currentGroupIdx].length;
+            const remainingDucks = ducks.filter(d => !d.isDead).length;
+
+            if (!isLastGroup && currentSize < targetGroupSize) {
+                await performHuntCycle();
+            } else if (isLastGroup && remainingDucks > 0) {
+                await performHuntCycle();
+            } else {
+                isAutoHunting = false;
+                document.getElementById('hunt-status').classList.add('hidden');
+                checkRoundEnd();
+            }
+        }
+
+        function shoot() {
+            playSound(100, 'square', 0.2, 0.4);
+            if (reticle.target) {
+                reticle.target.isDead = true;
+                groups[currentGroupIdx].push(reticle.target.name);
+                updateGroupUI();
+                saveToStorage();
+            }
+            reticle.active = false;
+            reticle.target = null;
+        }
+
+        function checkRoundEnd() {
+            const aliveCount = ducks.filter(d => !d.isDead).length;
+            const isLastGroup = currentGroupIdx === groups.length - 1;
+
+            const huntBtn = document.getElementById('hunt-btn');
+            const nextBtn = document.getElementById('next-group-btn');
+            const finishBtn = document.getElementById('finish-btn');
+
+            if (aliveCount === 0) {
+                huntBtn.classList.add('hidden');
+                nextBtn.classList.add('hidden');
+                finishBtn.classList.remove('hidden');
+                announce("HUNT COMPLETE!");
+            } else if (!isLastGroup) {
+                huntBtn.classList.add('hidden');
+                nextBtn.classList.remove('hidden');
+                announce("GROUP FULL!");
+            } else {
+                huntBtn.classList.remove('hidden');
+            }
+        }
+
+        function nextGroup() {
+            currentGroupIdx++;
+            document.getElementById('next-group-btn').classList.add('hidden');
+            document.getElementById('hunt-btn').classList.remove('hidden');
+            updateGroupUI();
+            announce(`GROUP ${currentGroupIdx + 1}`);
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#4caf50';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ducks.forEach(d => {
+                d.update();
+                d.draw();
+            });
+
+            if (reticle.active && reticle.target) {
+    const lerp = reticle.locking ? 0.3 : 0.05;
+    reticle.x += (reticle.target.x - reticle.x) * lerp;
+    reticle.y += (reticle.target.y - reticle.y) * lerp;
+
+    // 1. CREATE THE SCOPE GRADIENT (Dark Focus)
+    ctx.save();
+    // This creates a circular gradient centered on the reticle
+    // Inner radius (40) is clear, outer radius (canvas width) is dark
+    const gradient = ctx.createRadialGradient(
+        reticle.x, reticle.y, 40, 
+        reticle.x, reticle.y, canvas.width / 1.5
+    );
+    
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');      // Transparent at center
+    gradient.addColorStop(0.1, 'rgba(0, 0, 0, 0.4)');  // Light shadow starts
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');    // Heavy dark at edges
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    // 2. DRAW THE NEON GREEN RETICLE
+    // This part stays on top of the gradient
+    ctx.strokeStyle = reticle.locking ? (Math.floor(Date.now()/100)%2 ? '#39FF14' : 'red') : '#39FF14';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(reticle.x, reticle.y, 40, 0, Math.PI*2);
+    ctx.moveTo(reticle.x - 60, reticle.y); ctx.lineTo(reticle.x + 60, reticle.y);
+    ctx.moveTo(reticle.x, reticle.y - 60); ctx.lineTo(reticle.x, reticle.y + 60);
+    ctx.stroke();
+}
+
+            playBGM();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function saveToStorage() {
+            const data = { names, groups, currentGroupIdx, config: { count: document.getElementById('group-count').value } };
+            localStorage.setItem('duck_hunt_save', JSON.stringify(data));
+        }
+
+        function loadFromStorage() {
+            const saved = localStorage.getItem('duck_hunt_save');
+            if (saved) {
+                const data = JSON.parse(saved);
+                document.getElementById('names-input').value = (data.names || []).join('\n');
+                document.getElementById('group-count').value = data.config.count;
+                document.getElementById('save-status').innerText = "Data loaded!";
+            }
+        }
+
+        function exportToCSV() {
+            let csv = "Group,Member\n";
+            groups.forEach((g, i) => {
+                g.forEach(m => {
+                    csv += `Group ${i+1},"${m}"\n`;
+                });
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'duck_groups.csv');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function showSummary() {
+            cancelAnimationFrame(animationId);
+            document.getElementById('controls').classList.add('hidden');
+            document.getElementById('group-display').classList.add('hidden');
+            document.getElementById('summary-screen').classList.remove('hidden');
+            const list = document.getElementById('summary-list');
+            list.innerHTML = '';
+            groups.forEach((g, i) => {
+                const div = document.createElement('div');
+                div.className = "retro-input h-auto text-[10px]";
+                div.innerHTML = `<strong class="text-yellow-400">GROUP ${i+1}</strong><br>` + g.join('<br>');
+                list.appendChild(div);
+            });
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resize);
+   
+// --- MASTER SYNC SYSTEM V4 (Performance Optimized) ---
+const syncChannel = new BroadcastChannel('duck_hunt_controls');
+const isIframe = (window.self !== window.top);
+let lastSyncedTarget = "";
+
+// 1. BROADCAST: Only the Big Screen (Main Window) sends game results
+document.addEventListener('input', (e) => {
+    if (e.target.id) syncChannel.postMessage({ type: 'INPUT_SYNC', id: e.target.id, value: e.target.value });
+});
+
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (btn && btn.onclick) {
+        const funcStr = btn.getAttribute('onclick');
+        if (funcStr) syncChannel.postMessage({ type: 'EXECUTE_FUNC', func: funcStr });
+    }
+});
+
+// 2. LISTEN: Execute commands
+syncChannel.onmessage = (event) => {
+    const data = event.data;
+
+    if (data.type === 'SYNC_GAME_START' && isIframe) {
+        if (typeof initGame === 'function') initGame(data.names);
+        else if (typeof startGame === 'function') startGame(data.names);
+    }
+
+    if (data.type === 'SYNC_TARGET' && isIframe && typeof ducks !== 'undefined') {
+        const target = ducks.find(d => d.name === data.name);
+        if (target && !target.isDead) {
+            reticle.active = true;
+            reticle.target = target;
+            if (typeof reticle.lockObj !== 'undefined') reticle.lockObj = target;
+        }
+    }
+
+    if (data.type === 'INPUT_SYNC') {
+        const el = document.getElementById(data.id);
+        if (el) { el.value = data.value; el.dispatchEvent(new Event('input')); }
+    }
+
+    if (data.type === 'EXECUTE_FUNC' || typeof data === 'string') {
+        const cmd = data.type === 'EXECUTE_FUNC' ? data.func : data;
+
+        if (cmd.includes('initGame') || cmd.includes('startGame') || cmd === 'LOAD_FIELD') {
+            if (!isIframe) {
+                if (typeof initGame === 'function') initGame(); else startGame();
+                const nameList = ducks.map(d => d.name);
+                syncChannel.postMessage({ type: 'SYNC_GAME_START', names: nameList });
+            }
+        }
+        else if (cmd.includes('triggerHunt') || cmd.includes('startScanningSequence') || cmd === 'START_HUNT') {
+            if (typeof triggerHunt === 'function') triggerHunt();
+            else if (typeof startScanningSequence === 'function') startScanningSequence();
+        }
+        else if (cmd.includes('nextGroup') || cmd.includes('continueGame') || cmd === 'NEXT') {
+            if (typeof nextGroup === 'function') nextGroup(); else if (typeof continueGame === 'function') continueGame();
+        }
+        else if (cmd.includes('spinWheel') || cmd === 'SPIN') { if (typeof spinWheel === 'function') spinWheel(); }
+        else if (cmd.includes('saveToHistory') || cmd.includes('saveToStorage') || cmd === 'SAVE_PRESET') {
+            if (typeof saveToHistory === 'function') saveToHistory(); else if (typeof saveToStorage === 'function') saveToStorage();
+        }
+        else if (cmd.includes('loadFromStorage') || cmd.includes('loadHistory') || cmd === 'LOAD_DATA') {
+            if (typeof loadFromStorage === 'function') loadFromStorage(); else if (typeof loadHistory === 'function') loadHistory();
+        }
+        else if (cmd === 'RELOAD') location.reload();
+        else if (cmd === 'GO_HOME') window.location.href = 'viewer.html';
+    }
+
+    if (data.type === 'NAVIGATE') window.location.href = data.url;
+};
+
+// 3. OPTIMIZED TARGET SYNC: Only send if the target changes (Prevents Freezing)
+setInterval(() => {
+    if (!isIframe && typeof reticle !== 'undefined' && reticle.active) {
+        const t = reticle.target || reticle.lockObj;
+        if (t && t.name && t.name !== lastSyncedTarget) {
+            lastSyncedTarget = t.name;
+            syncChannel.postMessage({ type: 'SYNC_TARGET', name: t.name });
+        }
+    }
+}, 300); // Slower interval is much safer for performance
+
+syncChannel.postMessage({ type: 'PAGE_LOADED', url: window.location.pathname.split('/').pop() });
+
+   </script>
+</body>
+</html>
