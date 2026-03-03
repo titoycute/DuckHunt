@@ -6,6 +6,9 @@
     <title>Duck Hunt Tool Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -120,7 +123,11 @@
 </body>
 
 <script>
+
+    const bgMusic = new Audio('bg_music.mp3');
+    bgMusic.loop = true;
     const remoteChannel = new BroadcastChannel('duck_hunt_controls');
+    
     remoteChannel.onmessage = (event) => {
         if (event.data.type === 'NAVIGATE') {
             window.location.href = event.data.url;
@@ -129,6 +136,15 @@
         if (event.data === 'RELOAD') {
             location.reload();
         }
+        //BG MUSIC
+        if (event.data === 'TOGGLE_MUSIC') {
+        if (bgMusic.paused) {
+            bgMusic.play().catch(e => console.log("Click the page first to enable audio"));
+        } else {
+            bgMusic.pause();
+        }
+    }
+
     };
     
 </script>

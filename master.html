@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Duck Hunt - Mission Control</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        body { background: #1a1a1a; color: white; font-family: 'Press+Start+2P', cursive; padding: 0; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: #333; border-bottom: 4px solid #555; height: 50px; flex-shrink: 0; }
+        
+        .btn-launch { background: #ffeb3b; color: #000; border: 4px solid #fbc02d; font-size: 10px; padding: 10px 15px; cursor: pointer; }
+        
+        .controls-area { background: #222; padding: 12px; border-bottom: 4px solid #444; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+        .section { display: flex; gap: 10px; align-items: center; justify-content: center; }
+        .section-label { font-size: 7px; color: #ffeb3b; width: 90px; text-align: right; }
+        .grid { display: flex; gap: 8px; }
+        
+        button { padding: 10px 8px; font-family: 'Press+Start+2P', cursive; font-size: 8px; cursor: pointer; border: 3px solid #000; color: white; border-radius: 5px; min-width: 105px; }
+        .btn-nav { background: #555; }
+        .btn-setup { background: #2196f3; }
+        .btn-hunt { background: #ff5722; }
+        .btn-next { background: #4caf50; }
+        .btn-home { background: #000; color: #ffeb3b; border-color: #ffeb3b; }
+
+        .viewer-container { flex: 1; background: #000; overflow: auto; display: flex; justify-content: center; padding: 10px; }
+        .monitor-frame { border: 10px solid #111; background: #000; }
+        #mini-viewer { width: 1920px; height: 1080px; border: none; transform-origin: 0 0; }
+    </style>
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#ff5722">
+</head>
+<body>
+    <div class="top-bar">
+        <button class="btn-launch" onclick="launchPresentation()">🚀 LAUNCH BIG SCREEN</button>
+        <button id="installApp" class="btn-launch" style="display:none; background: #4caf50; margin-left: 10px;">📲 INSTALL APP</button>
+        <div style="font-size: 9px;">VIEWER ZOOM: <input type="range" id="scaleSlider" min="0.15" max="0.6" step="0.05" value="0.3"></div>
+    </div>
+
+    <div class="controls-area">
+        <div class="section">
+            <span class="section-label">MISSIONS:</span>
+            <div class="grid">
+                <button class="btn-nav" onclick="nav('tool-team.html')">GROUPER</button>
+                <button class="btn-nav" onclick="nav('tool-group-hunt.html')">GROUP HUNT</button>
+                <button class="btn-nav" onclick="nav('tool-name-picker.html')">PICKER PRO</button>
+                <button class="btn-nav" style="background: #9c27b0;" onclick="nav('tool-wheel.html')">WHEEL</button>
+                <button class="btn-home" onclick="send('GO_HOME')">EXIT</button>
+            </div>
+        </div>
+        <div class="section">
+            <span class="section-label">SETUP:</span>
+            <div class="grid">
+                <button class="btn-setup" onclick="send('LOAD_DATA')">LOAD LAST</button>
+                <button class="btn-setup" onclick="send('SAVE_PRESET')">SAVE PRESET</button>
+                <button class="btn-setup" style="background: #673ab7;" onclick="send('LOAD_FIELD')">LOAD FIELD</button>
+                 <button class="btn-setup" style="background: #e91e63;" onclick="send('TOGGLE_MUSIC')">🎵 MUSIC ON/OFF</button>
+                <button class="btn-nav" onclick="send('RELOAD')">REFRESH</button>
+            </div>
+        </div>
+        <div class="section">
+            <span class="section-label">LIVE:</span>
+            <div class="grid">
+                <button class="btn-hunt" onclick="send('START_HUNT')">START HUNT</button>
+                <button class="btn-next" onclick="send('NEXT')">NEXT STEP</button>
+                <button class="btn-setup" style="background: #9c27b0;" onclick="send('SPIN')">SPIN WHEEL</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="viewer-container">
+        <div class="monitor-frame">
+            <iframe id="mini-viewer" src="viewer.html"></iframe>
+        </div>
+    </div>
+
+    <script>
+        const bc = new BroadcastChannel('duck_hunt_controls');
+        const viewer = document.getElementById('mini-viewer');
+        const slider = document.getElementById('scaleSlider');
+
+        function launchPresentation() {
+            window.open('viewer.html', 'DuckDisplay', 'width=1280,height=720');
+        }
+
+        const updateScale = () => {
+            const val = slider.value;
+            viewer.style.transform = `scale(${val})`;
+            document.querySelector('.monitor-frame').style.width = (1920 * val) + 'px';
+            document.querySelector('.monitor-frame').style.height = (1080 * val) + 'px';
+        };
+        slider.oninput = updateScale;
+        updateScale();
+
+        function nav(url) { bc.postMessage({ type: 'NAVIGATE', url: url }); viewer.src = url; }
+        function send(cmd) { bc.postMessage(cmd); if(cmd === 'GO_HOME') viewer.src = 'viewer.html'; }
+
+        bc.onmessage = (e) => {
+            if (e.data.type === 'PAGE_LOADED' && !viewer.src.includes(e.data.url)) viewer.src = e.data.url;
+        };
+
+        // --- OFFLINE & INSTALL LOGIC ---
+let deferredPrompt;
+const installBtn = document.getElementById('installApp');
+
+// Register the Service Worker for Offline Mode
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+        .then(() => console.log("Offline Mode Ready"));
+}
+
+// Listen for the "Install" prompt from the browser
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.style.display = 'inline-block'; // Show button when ready
+});
+
+installBtn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            installBtn.style.display = 'none';
+        }
+        deferredPrompt = null;
+    }
+});
+
+    </script>
+</body>
+</html>

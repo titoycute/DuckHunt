@@ -6,6 +6,9 @@
     <title>Duck Hunt Group Picker V3.9</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Press+Start+2P', cursive; user-select: none; }
@@ -445,9 +448,22 @@ document.addEventListener('click', (e) => {
     }
 });
 
+
+const bgMusic = new Audio('bg_music.mp3');
+bgMusic.loop = true;
+bgMusic.volume = 0.4; 
+
 // 2. LISTEN: Execute commands
 syncChannel.onmessage = (event) => {
     const data = event.data;
+
+      if (data === 'TOGGLE_MUSIC') {
+        if (bgMusic.paused) {
+            bgMusic.play();
+        } else {
+            bgMusic.pause();
+        }
+    }
 
     if (data.type === 'SYNC_GAME_START' && isIframe) {
         if (typeof initGame === 'function') initGame(data.names);

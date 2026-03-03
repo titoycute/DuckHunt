@@ -7,6 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="src/sniper.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -361,10 +364,23 @@
         }
         renderHistory();
 
+
+        const bgMusic = new Audio('bg_music.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.4; 
         // --- SYNC SYSTEM ---
         const syncChannel = new BroadcastChannel('duck_hunt_controls');
         syncChannel.onmessage = (event) => {
             const data = event.data;
+
+            if (data === 'TOGGLE_MUSIC') {
+                if (bgMusic.paused) {
+                    bgMusic.play();
+                } else {
+                    bgMusic.pause();
+                }
+            }
+             
             if (data.type === 'EXECUTE_FUNC' || typeof data === 'string') {
                 const cmd = data.type === 'EXECUTE_FUNC' ? data.func : data;
                 if (cmd.includes('initWheel') || cmd === 'LOAD_FIELD') initWheel();
