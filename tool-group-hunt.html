@@ -11,13 +11,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Press+Start+2P', cursive; user-select: none; }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Press Start 2P', cursive; user-select: none; }
         #game-canvas { display: block; background-image: url('bg_field.gif'); background-size: cover; background-position: center; }
         .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         .panel { pointer-events: auto; background: rgba(0, 0, 0, 0.9); border: 6px solid #fff; color: #fff; padding: 30px; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
         #setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 500; }
         textarea { font-family: monospace; width: 100%; height: 150px; margin: 10px 0; padding: 15px; background: #222; color: #0f0; border: 3px solid #555; font-size: 11px; outline: none; }
-        button { background: #ff5722; color: white; padding: 12px 20px; border: 4px solid #bf360c; cursor: pointer; font-family: 'Press+Start+2P', cursive; font-size: 10px; transition: transform 0.1s; }
+        button { background: #ff5722; color: white; padding: 12px 20px; border: 4px solid #bf360c; cursor: pointer; font-family: 'Press Start 2P', cursive; font-size: 10px; transition: transform 0.1s; }
         button:hover { background: #ff7043; }
         .secondary-btn { background: #4caf50; border-color: #2e7d32; }
         #winner-popup { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); z-index: 400; width: 90%; max-width: 800px; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
@@ -529,4 +529,5 @@ setInterval(() => {
 syncChannel.postMessage({ type: 'PAGE_LOADED', url: window.location.pathname.split('/').pop() });
     </script>
 </body>
+
 </html>
